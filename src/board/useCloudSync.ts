@@ -3,7 +3,7 @@ import {
   deleteCloudAccount,
   fetchCloud,
   insertCloud,
-  supabase,
+  getSupabase,
   updateCloud,
   type CloudUser,
 } from './cloud';
@@ -104,9 +104,20 @@ export function useCloudSync({ workspace, applyRemote, paused, enabled }: CloudS
       const next = session ? { id: session.user.id, email: session.user.email ?? '' } : null;
       setUser((current) => (current?.id === next?.id ? current : next));
     };
-    void supabase.auth.getSession().then(({ data }) => adopt(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => adopt(session));
-    return () => data.subscription.unsubscribe();
+    let live = true;
+    let unsubscribe = () => {};
+    void getSupabase().then((supabase) => {
+      if (!live) return;
+      void supabase.auth.getSession().then(({ data }) => {
+        if (live) adopt(data.session);
+      });
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => adopt(session));
+      unsubscribe = () => data.subscription.unsubscribe();
+    });
+    return () => {
+      live = false;
+      unsubscribe();
+    };
   }, [enabled]);
 
   const remember = useCallback((userId: string, nextVersion: number, known: Workspace) => {
@@ -305,7 +316,7 @@ export function useCloudSync({ workspace, applyRemote, paused, enabled }: CloudS
   );
 
   const leaveAccount = useCallback(async () => {
-    await supabase.auth.signOut({ scope: 'local' });
+    await (await getSupabase()).auth.signOut({ scope: 'local' });
     writeMeta(null);
     userRef.current = null;
     setUser(null);

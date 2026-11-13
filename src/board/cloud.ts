@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Workspace } from './types';
 
 // The publishable key is meant to ship to browsers. Row level security protects the data.
@@ -11,30 +11,43 @@ export const TURNSTILE_SITE_KEY =
   import.meta.env.VITE_TURNSTILE_SITE_KEY ??
   (import.meta.env.DEV ? '1x00000000000000000000AA' : '0x4AAAAAAF5c_Wp7OnSOZobr');
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { detectSessionInUrl: false },
-});
+let client: Promise<SupabaseClient> | null = null;
+
+/**
+ * The Supabase library is loaded on first use, so it isn't part of the startup
+ * download. The board draws from this browser's copy first and syncs after.
+ */
+export function getSupabase(): Promise<SupabaseClient> {
+  client ??= import('@supabase/supabase-js').then(({ createClient }) =>
+    createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { detectSessionInUrl: false } }),
+  );
+  return client;
+}
 
 export type CloudUser = { id: string; email: string };
 export type CloudRow = { data: unknown; version: number };
 
 export async function sendCode(email: string, captchaToken: string) {
+  const supabase = await getSupabase();
   const { error } = await supabase.auth.signInWithOtp({ email, options: { captchaToken } });
   if (error) throw error;
 }
 
 export async function verifyCode(email: string, token: string) {
+  const supabase = await getSupabase();
   const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
   if (error) throw error;
 }
 
 /** Removes the login. The database then removes the saved workspace along with it. */
 export async function deleteCloudAccount() {
+  const supabase = await getSupabase();
   const { error } = await supabase.rpc('delete_my_account');
   if (error) throw error;
 }
 
 export async function fetchCloud(userId: string): Promise<CloudRow | null> {
+  const supabase = await getSupabase();
   const { data, error } = await supabase
     .from('workspaces')
     .select('data, version')
@@ -45,6 +58,7 @@ export async function fetchCloud(userId: string): Promise<CloudRow | null> {
 }
 
 export async function insertCloud(userId: string, workspace: Workspace): Promise<number> {
+  const supabase = await getSupabase();
   const { data, error } = await supabase
     .from('workspaces')
     .insert({ user_id: userId, data: workspace })
@@ -59,6 +73,7 @@ export async function updateCloud(
   workspace: Workspace,
   expectedVersion: number,
 ): Promise<number | null> {
+  const supabase = await getSupabase();
   const { data, error } = await supabase
     .from('workspaces')
     .update({

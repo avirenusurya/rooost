@@ -9,6 +9,7 @@ import {
   toDateKey,
 } from '../board/dates';
 import {
+  addSessionsByDay,
   currentStreak,
   mondayOf,
   secondsByDay,
@@ -19,16 +20,30 @@ import {
   withRunningTimer,
 } from '../board/stats';
 import { dotColor } from '../board/labels';
-import { useTimerApi } from '../board/timerContext';
-import { activePins, findCard, isCardDone, type Card, type Workspace } from '../board/types';
+import { useNow, useTimerApi } from '../board/timerContext';
+import { activePins, isCardDone, type Card, type Workspace } from '../board/types';
 import { ChevronRightIcon, CloseIcon, PinIcon, PlayIcon, StopIcon } from './Icons';
 import { Heatmap } from './Heatmap';
+import { Timeline } from './Timeline';
+import { Calendar } from './Calendar';
+
+const PLAN_VIEW_KEY = 'rooost.planView';
+type PlanView = 'timeline' | 'calendar';
+
+function readPlanView(): PlanView {
+  try {
+    return localStorage.getItem(PLAN_VIEW_KEY) === 'calendar' ? 'calendar' : 'timeline';
+  } catch {
+    return 'timeline';
+  }
+}
 
 const fullDay = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 
 type YouPageProps = {
   workspace: Workspace;
-  now: number;
+  /** False while the page is slid out of view; its clock pauses then. */
+  active: boolean;
   onOpenCard: (id: string) => void;
   onTogglePin: (id: string) => void;
   onDeleteSession: (id: string) => void;
@@ -93,37 +108,68 @@ function PinRow({ cards, onOpenCard }: { cards: Card[]; onOpenCard: (id: string)
   );
 }
 
-export function YouPage({ workspace, now, onOpenCard, onTogglePin, onDeleteSession }: YouPageProps) {
+export function YouPage({ workspace, active, onOpenCard, onTogglePin, onDeleteSession }: YouPageProps) {
   const { tracked, runningCardId, start, stop, discard } = useTimerApi();
+  const now = useNow(active ? (workspace.timer ? 15000 : 60000) : null);
   const [boardFilter, setBoardFilter] = useState('all');
   const [selectedDay, setSelectedDay] = useState(() => toDateKey(new Date()));
+  const [planView, setPlanViewState] = useState<PlanView>(readPlanView);
+  const setPlanView = (next: PlanView) => {
+    setPlanViewState(next);
+    try {
+      localStorage.setItem(PLAN_VIEW_KEY, next);
+    } catch {
+      // Remembering the choice is a nicety; it still works without storage.
+    }
+  };
 
-  const sessions = useMemo(
-    () => withRunningTimer(workspace.sessions, workspace.timer, now),
-    [workspace.sessions, workspace.timer, now],
-  );
-
-  const overall = useMemo(() => secondsByDay(sessions), [sessions]);
+  // History is counted once per change; the running timer is added on top each tick.
+  const running = useMemo(() => withRunningTimer([], workspace.timer, now), [workspace.timer, now]);
+  const pastOverall = useMemo(() => secondsByDay(workspace.sessions), [workspace.sessions]);
+  const overall = useMemo(() => addSessionsByDay(pastOverall, running), [pastOverall, running]);
 
   // A board that was deleted or filtered away shouldn't leave a stale filter behind.
   const filter = workspace.boards.some((board) => board.id === boardFilter) ? boardFilter : 'all';
-  const filtered = useMemo(
-    () => (filter === 'all' ? sessions : sessions.filter((session) => session.boardId === filter)),
-    [sessions, filter],
+  const pastFiltered = useMemo(
+    () => (filter === 'all' ? workspace.sessions : workspace.sessions.filter((session) => session.boardId === filter)),
+    [workspace.sessions, filter],
   );
-  const heat = useMemo(() => (filter === 'all' ? overall : secondsByDay(filtered)), [filter, overall, filtered]);
+  const runningFiltered = useMemo(
+    () => (filter === 'all' ? running : running.filter((session) => session.boardId === filter)),
+    [running, filter],
+  );
+  const filtered = useMemo(() => [...pastFiltered, ...runningFiltered], [pastFiltered, runningFiltered]);
+  const pastHeat = useMemo(
+    () => (filter === 'all' ? pastOverall : secondsByDay(pastFiltered)),
+    [filter, pastOverall, pastFiltered],
+  );
+  const heat = useMemo(() => addSessionsByDay(pastHeat, runningFiltered), [pastHeat, runningFiltered]);
 
-  const allTimeSeconds = filtered.reduce((sum, session) => sum + session.seconds, 0);
+  const pastAllTime = useMemo(() => pastFiltered.reduce((sum, session) => sum + session.seconds, 0), [pastFiltered]);
+  const allTimeSeconds = runningFiltered.reduce((sum, session) => sum + session.seconds, pastAllTime);
+
+  const labelsByCard = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const board of workspace.boards) {
+      for (const card of Object.values(board.cards)) map.set(card.id, card.labelIds);
+    }
+    return map;
+  }, [workspace.boards]);
+  const pastTagTotals = useMemo(
+    () =>
+      secondsByLabel(pastFiltered, (session) => labelsByCard.get(session.cardId) ?? session.labelIds ?? []),
+    [pastFiltered, labelsByCard],
+  );
   const tagTotals = useMemo(() => {
-    const totals = secondsByLabel(
-      filtered,
-      (session) => findCard(workspace, session.cardId)?.card.labelIds ?? session.labelIds ?? [],
-    );
+    const totals = new Map(pastTagTotals);
+    for (const session of runningFiltered) {
+      for (const id of labelsByCard.get(session.cardId) ?? []) totals.set(id, (totals.get(id) ?? 0) + session.seconds);
+    }
     return workspace.labels
       .map((label) => ({ label, seconds: totals.get(label.id) ?? 0 }))
       .filter((item) => item.seconds > 0)
       .sort((a, b) => b.seconds - a.seconds);
-  }, [filtered, workspace]);
+  }, [pastTagTotals, runningFiltered, labelsByCard, workspace.labels]);
 
   const today = new Date(now);
   const todaySeconds = overall.get(toDateKey(today)) ?? 0;
@@ -143,6 +189,11 @@ export function YouPage({ workspace, now, onOpenCard, onTogglePin, onDeleteSessi
     .sort((a, b) => a.card.due!.localeCompare(b.card.due!));
 
   const dayEntries = sessionsOnDay(filtered, selectedDay);
+  const dueOnDay = workspace.boards.flatMap((board) =>
+    Object.values(board.cards)
+      .filter((card) => card.due === selectedDay)
+      .map((card) => ({ board, card, done: isCardDone(board, card.id) })),
+  );
   const dayTotal = dayEntries.reduce((sum, entry) => sum + entry.seconds, 0);
 
   const boardNameOf = (boardId: string, fallback: string) =>
@@ -185,7 +236,7 @@ export function YouPage({ workspace, now, onOpenCard, onTogglePin, onDeleteSessi
               </div>
             )}
           </div>
-          <Heatmap totals={heat} selected={selectedDay} onSelect={setSelectedDay} />
+          <Heatmap totals={heat} selected={selectedDay} onSelect={setSelectedDay} todayKey={toDateKey(new Date(now))} />
           <div className="heat-foot">
             {allTimeSeconds > 0 && (
               <div className="heat-totals">
@@ -209,6 +260,32 @@ export function YouPage({ workspace, now, onOpenCard, onTogglePin, onDeleteSessi
               <span>4h or more</span>
             </div>
           </div>
+        </section>
+
+        <section className="panel panel--plan" aria-label="Plan">
+          <div className="panel-head">
+            <h2>Plan</h2>
+            <div className="view-slider view-slider--small" data-view={planView} role="group" aria-label="Plan view">
+              <span className="view-thumb" aria-hidden="true" />
+              <button type="button" aria-pressed={planView === 'timeline'} onClick={() => setPlanView('timeline')}>
+                Timeline
+              </button>
+              <button type="button" aria-pressed={planView === 'calendar'} onClick={() => setPlanView('calendar')}>
+                Calendar
+              </button>
+            </div>
+          </div>
+          {planView === 'timeline' ? (
+            <Timeline boards={workspace.boards} sessions={workspace.sessions} onOpenCard={onOpenCard} />
+          ) : (
+            <Calendar
+              boards={workspace.boards}
+              totals={heat}
+              selected={selectedDay}
+              onSelect={setSelectedDay}
+              onOpenCard={onOpenCard}
+            />
+          )}
         </section>
 
         <div className="you-lower">
@@ -270,6 +347,19 @@ export function YouPage({ workspace, now, onOpenCard, onTogglePin, onDeleteSessi
               <h2>{fullDay.format(dateFromKey(selectedDay))}</h2>
               {dayTotal > 0 && <span className="panel-count">{formatDuration(dayTotal)}</span>}
             </div>
+            {dueOnDay.length > 0 && (
+              <ul className="rows rows--due" aria-label="Due this day">
+                {dueOnDay.map(({ board, card, done }) => (
+                  <li key={card.id} className="row" data-accent={board.color}>
+                    <button type="button" className="row-main" onClick={() => onOpenCard(card.id)}>
+                      <span className="row-title">{card.title}</span>
+                      <span className="row-sub">{board.title}</span>
+                    </button>
+                    <span className={done ? 'row-due' : 'row-due is-soon'}>{done ? 'Done' : 'Due'}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
             {dayEntries.length === 0 ? (
               <p className="panel-empty">Nothing tracked on this day.</p>
             ) : (

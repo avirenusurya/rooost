@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -7,6 +8,7 @@ import {
   useSyncExternalStore,
   type Dispatch,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from 'react';
 import { flushSync } from 'react-dom';
 import { ContextMenuContext, type MenuTarget } from './board/contextMenu';
@@ -103,6 +105,38 @@ function useIsPhone() {
     () => window.matchMedia('(max-width: 720px)').matches,
   );
 }
+
+/** True once the clock passes `at`. Waits with one timeout instead of re-rendering on a tick. */
+function useIsPast(at: number | null): boolean {
+  const [past, setPast] = useState(() => at !== null && Date.now() >= at);
+  useEffect(() => {
+    if (at === null) {
+      setPast(false);
+      return;
+    }
+    const check = () => setPast(Date.now() >= at);
+    check();
+    const wait = at - Date.now();
+    const timeout = wait > 0 ? setTimeout(check, Math.min(wait + 50, 2 ** 31 - 1)) : undefined;
+    // Timers can stall while a laptop sleeps, so look again when the page comes back.
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [at]);
+  return past;
+}
+
+/** The view that's slid out of sight skips re-rendering until it's shown again. */
+const WhenShown = memo(
+  function WhenShown({ children }: { active: boolean; children: ReactNode }) {
+    return children;
+  },
+  (prev, next) => !prev.active && !next.active,
+);
 
 function Wordmark({ running }: { running: boolean }) {
   return (
@@ -207,8 +241,8 @@ export default function App() {
   const importInput = useRef<HTMLInputElement>(null);
   const tourChecked = useRef(false);
 
-  const hasTimer = Boolean(workspace?.timer);
-  const now = useNow(hasTimer ? 15000 : 60000);
+  const staleAt = workspace?.timer ? workspace.timer.checkedAt + STALE_AFTER_MS : null;
+  const timerIsStale = useIsPast(staleAt);
 
   const board =
     workspace?.boards.find((item) => item.id === workspace.activeBoardId) ?? workspace?.boards[0];
@@ -663,7 +697,7 @@ export default function App() {
         ? columnMenu(contextMenu.target.id, contextMenu.target.onRename)
         : boardMenu(contextMenu.target.id);
 
-  const isStale = Boolean(timer && !touring && now - timer.checkedAt >= STALE_AFTER_MS);
+  const isStale = Boolean(timer && !touring && timerIsStale);
 
   const timerPill = timer && !touring && (
     <TimerPill
@@ -780,6 +814,7 @@ export default function App() {
         <div className="views-window">
           <div className="views" data-view={view}>
             <div className="view" inert={view !== 'boards'}>
+              <WhenShown active={view === 'boards'}>
               <BoardsPage
                 workspace={workspace}
                 board={board}
@@ -823,15 +858,18 @@ export default function App() {
                   { label: 'Delete board', danger: true, onSelect: () => setBoardToDelete(board) },
                 ]}
               />
+              </WhenShown>
             </div>
             <div className="view" inert={view !== 'you'}>
+              <WhenShown active={view === 'you'}>
               <YouPage
                 workspace={workspace}
-                now={now}
+                active={view === 'you'}
                 onOpenCard={setOpenCardId}
                 onTogglePin={togglePin}
                 onDeleteSession={(id) => dispatchWithUndo({ type: 'deleteSession', id }, 'Time log deleted')}
               />
+              </WhenShown>
             </div>
           </div>
         </div>

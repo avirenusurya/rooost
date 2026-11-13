@@ -40,6 +40,16 @@ export function secondsByDay(sessions: Session[]): Map<string, number> {
   return totals;
 }
 
+/** Adds a few sessions to existing day totals without recounting the rest. */
+export function addSessionsByDay(base: Map<string, number>, extra: Session[]): Map<string, number> {
+  if (extra.length === 0) return base;
+  const totals = new Map(base);
+  for (const session of extra) {
+    eachDay(session, (key, seconds) => totals.set(key, (totals.get(key) ?? 0) + seconds));
+  }
+  return totals;
+}
+
 export function secondsByCard(sessions: Session[]): Map<string, number> {
   const totals = new Map<string, number>();
   for (const session of sessions) {
@@ -66,7 +76,12 @@ export type DayEntry = { session: Session; seconds: number };
 
 export function sessionsOnDay(sessions: Session[], dayKey: string): DayEntry[] {
   const entries: DayEntry[] = [];
+  const [year, month, day] = dayKey.split('-').map(Number);
+  const dayStart = new Date(year, month - 1, day).getTime();
+  const dayEnd = new Date(year, month - 1, day + 1).getTime();
   for (const session of sessions) {
+    // Most sessions are on other days; skip them before walking their hours.
+    if (session.endedAt <= dayStart || session.startedAt >= dayEnd) continue;
     let seconds = 0;
     eachDay(session, (key, part) => {
       if (key === dayKey) seconds += part;

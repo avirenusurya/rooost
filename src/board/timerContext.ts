@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useLayoutEffect, useState } from 'react';
 
 export type TimerApi = {
   tracked: Map<string, number>;
@@ -22,7 +22,8 @@ export const useTimerApi = () => useContext(TimerContext);
 
 export function useNow(intervalMs: number | null): number {
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
+  // Layout effect, so a clock that resumes shows the fresh time on its first paint.
+  useLayoutEffect(() => {
     if (intervalMs === null) return;
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), intervalMs);

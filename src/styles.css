@@ -12,6 +12,7 @@
   --ink-3: rgb(31 31 34 / 0.46);
   --line: rgb(31 31 34 / 0.08);
   --scroll: rgb(0 0 0 / 0.16);
+  --scroll-hover: rgb(0 0 0 / 0.32);
   --green: #08c225;
   --on-green: #1f1f22;
   --green-contrast: #067a18;
@@ -74,6 +75,7 @@
   --ink-3: rgb(245 245 246 / 0.46);
   --line: rgb(255 255 255 / 0.09);
   --scroll: rgb(255 255 255 / 0.18);
+  --scroll-hover: rgb(255 255 255 / 0.34);
   --green-contrast: #46e063;
   --red: #ff7a6e;
   --danger-wash: rgb(255 122 110 / 0.14);
@@ -107,6 +109,54 @@
   --hm-3: #1fae41;
   --hm-4: #52e770;
   --tour-shade: rgb(0 0 0 / 0.72);
+}
+
+/* Scrollbars: one slim, rounded style for every scroll area. */
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  min-width: 40px;
+  min-height: 40px;
+  background: var(--scroll);
+  background-clip: padding-box;
+  border: 3.5px solid transparent;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scroll-hover);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--ink-3);
+}
+
+/* Firefox has no pseudo-elements for this, only colour and width. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll) transparent;
+  }
+}
+
+@media (max-width: 720px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border-width: 2px;
+  }
 }
 
 /* Board colours */
@@ -441,7 +491,8 @@ i {
   transition: transform 320ms var(--ease);
 }
 
-.view-slider[data-view='you'] .view-thumb {
+.view-slider[data-view='you'] .view-thumb,
+.view-slider[data-view='calendar'] .view-thumb {
   transform: translateX(100%);
 }
 
@@ -980,8 +1031,6 @@ kbd {
   padding: 0 24px 24px;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scroll) transparent;
 }
 
 .column {
@@ -1092,8 +1141,6 @@ kbd {
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scroll) transparent;
   border-radius: var(--radius-card);
 }
 
@@ -1618,8 +1665,6 @@ kbd {
   left: calc(100% + 2px);
   max-height: min(60vh, 460px);
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scroll) transparent;
 }
 
 .ctx-list--sub.is-flipped {
@@ -1799,8 +1844,6 @@ kbd {
   max-height: min(380px, 50dvh);
   margin: 14px -8px 0;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scroll) transparent;
 }
 
 .tag-row {
@@ -1973,8 +2016,6 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 22px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scroll) transparent;
 }
 
 .sheet-top {
@@ -2052,7 +2093,6 @@ kbd {
   max-width: min(260px, calc(100vw - 56px));
   max-height: 264px;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .pill-option {
@@ -2436,8 +2476,6 @@ kbd {
   gap: 14px;
   padding: 0 24px 24px;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scroll) transparent;
 }
 
 .pins-wrap {
@@ -2673,6 +2711,474 @@ button.hm:hover {
 
 .heat-legend span:last-child {
   margin-left: 4px;
+}
+
+/* Timeline */
+
+.tl {
+  --tl-lane: 150px;
+  --tl-day: 44px;
+  --tl-row: 40px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border-radius: 18px;
+  background: var(--well);
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-head,
+.tl-lane {
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+}
+
+.tl-lane {
+  border-top: 1px solid var(--line);
+}
+
+.tl-corner,
+.tl-lane-name {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  flex: none;
+  width: var(--tl-lane);
+  background: var(--well-2);
+}
+
+.tl-track {
+  display: grid;
+}
+
+.tl-lane .tl-track {
+  padding: 4px 0;
+}
+
+.tl-month {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  border-left: 1px solid var(--line);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tl-month span {
+  position: sticky;
+  left: calc(var(--tl-lane) + 12px);
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.tl-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 44px;
+  border-left: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tl-day small {
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.tl-day.is-weekend,
+.tl-cell.is-weekend {
+  background: var(--raised-hover);
+}
+
+.tl-day.is-today {
+  background: var(--action);
+  color: var(--action-ink);
+  border-radius: 10px 10px 0 0;
+}
+
+.tl-day.is-today small {
+  color: inherit;
+  opacity: 0.7;
+}
+
+.tl-lane-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 15px;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.tl-lane-name i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-dot);
+}
+
+.tl-lane-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tl-cell {
+  margin: -4px 0;
+  border-left: 1px solid var(--line);
+}
+
+.tl-now {
+  z-index: 1;
+  justify-self: center;
+  width: 2px;
+  margin: -4px 0;
+  background: var(--red);
+  pointer-events: none;
+}
+
+.tl-bar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 30px;
+  align-self: center;
+  margin: 0 3px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--done);
+  color: var(--done-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+  transition: transform 150ms var(--ease), filter 150ms var(--ease);
+}
+
+:root[data-theme='dark'] .tl-bar {
+  background: var(--done-card);
+}
+
+.tl-bar:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.tl-bar.is-late {
+  box-shadow: inset 0 0 0 2px var(--red);
+}
+
+.tl-bar.is-clipped {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+/* Keeps the title readable when the bar started off to the left. */
+.tl-bar-title {
+  position: sticky;
+  left: calc(var(--tl-lane) + 12px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tl-bar-meta {
+  flex: none;
+  margin-left: auto;
+  opacity: 0.72;
+  font-weight: 500;
+}
+
+/* On phones the board name sits above its bars instead of taking a column. */
+@media (max-width: 720px) {
+  .tl {
+    --tl-lane: 0px;
+    --tl-day: 36px;
+    --tl-row: 36px;
+    margin: 0 -8px;
+    border-radius: 16px;
+  }
+
+  .tl-corner {
+    display: none;
+  }
+
+  .tl-lane {
+    flex-direction: column;
+  }
+
+  .tl-lane-name {
+    align-self: flex-start;
+    width: auto;
+    max-width: calc(100vw - 48px);
+    height: 30px;
+    margin-top: 6px;
+    padding: 0 12px;
+    background: transparent;
+    font-size: 13px;
+  }
+
+  .tl-lane .tl-track {
+    padding-top: 0;
+  }
+
+  .tl-day {
+    height: 40px;
+    font-size: 13px;
+  }
+
+  .tl-bar {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .tl-bar:hover {
+    transform: none;
+  }
+}
+
+.view-slider--small {
+  width: 196px;
+  height: 36px;
+}
+
+.view-slider--small button {
+  font-size: 13px;
+}
+
+.rows--due {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rows--due .row-main {
+  padding-left: 10px;
+  border-left: 3px solid var(--accent-dot);
+}
+
+/* Calendar */
+
+.cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.cal-nav h3 {
+  margin-right: auto;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cal-prev svg {
+  transform: rotate(180deg);
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.cal-weekday {
+  padding: 0 10px 4px;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cal-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 96px;
+  padding: 8px;
+  background: var(--well);
+  border-radius: 14px;
+  transition: background 150ms var(--ease);
+}
+
+.cal-day:hover {
+  background: var(--well-2);
+}
+
+.cal-day.is-outside {
+  opacity: 0.45;
+}
+
+.cal-day.is-selected {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.cal-day-hit {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.cal-day-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.cal-date {
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-day.is-today .cal-date {
+  background: var(--action);
+  color: var(--action-ink);
+}
+
+.cal-time {
+  color: var(--green-contrast);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cal-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.cal-chip {
+  position: relative;
+  pointer-events: auto;
+  overflow: hidden;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--done);
+  color: var(--done-ink);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-theme='dark'] .cal-chip {
+  background: var(--done-card);
+}
+
+.cal-chip:hover {
+  filter: brightness(1.08);
+}
+
+.cal-chip.is-late {
+  box-shadow: inset 0 0 0 1.5px var(--red);
+}
+
+.cal-chip.is-done {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.cal-more {
+  padding: 0 8px;
+  color: var(--ink-2);
+  font-size: 11px;
+}
+
+/* Phones: titles turn into coloured dots; tap the day to see it below. */
+@media (max-width: 720px) {
+  .view-slider--small {
+    width: 172px;
+  }
+
+  .cal-grid {
+    gap: 3px;
+  }
+
+  .cal-weekday {
+    padding: 0 0 4px;
+    text-align: center;
+    font-size: 11px;
+  }
+
+  .cal-day {
+    align-items: center;
+    min-height: 60px;
+    padding: 5px 2px;
+    border-radius: 10px;
+  }
+
+  .cal-day-top {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .cal-date {
+    min-width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+
+  .cal-time {
+    font-size: 9px;
+  }
+
+  .cal-chips {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  .cal-chip {
+    width: 7px;
+    height: 7px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 0;
+    pointer-events: none;
+    background: var(--accent-dot);
+  }
+
+  :root[data-theme='dark'] .cal-chip {
+    background: var(--accent-dot);
+  }
+
+  .cal-more {
+    display: none;
+  }
+
+  .tl-lane .tl-cell,
+  .tl-lane .tl-now {
+    margin-top: 0;
+  }
 }
 
 .you-lower {

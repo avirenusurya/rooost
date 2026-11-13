@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { formatDuration, toDateKey } from '../board/dates';
 import { heatLevel, mondayOf } from '../board/stats';
 
@@ -13,14 +13,15 @@ type HeatmapProps = {
   totals: Map<string, number>;
   selected: string;
   onSelect: (key: string) => void;
+  /** Passed in so the grid moves on to a new day at midnight. */
+  todayKey: string;
 };
 
-export function Heatmap({ totals, selected, onSelect }: HeatmapProps) {
+export const Heatmap = memo(function Heatmap({ totals, selected, onSelect, todayKey }: HeatmapProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const grid = useRef<HTMLDivElement>(null);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
 
-  const todayKey = toDateKey(new Date());
 
   const { cells, months } = useMemo(() => {
     const today = new Date();
@@ -101,4 +102,4 @@ export function Heatmap({ totals, selected, onSelect }: HeatmapProps) {
       </div>
     </div>
   );
-}
+});

@@ -17,17 +17,17 @@ export function dateKeyFromToday(offsetDays: number): string {
   return toDateKey(date);
 }
 
+// Built once: creating an Intl formatter is far slower than using one.
+const dueThisYear = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+const dueOtherYear = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
 export function formatDue(key: string): string {
-  if (key === dateKeyFromToday(0)) return 'Today';
+  const today = new Date();
+  if (key === toDateKey(today)) return 'Today';
   if (key === dateKeyFromToday(1)) return 'Tomorrow';
   if (key === dateKeyFromToday(-1)) return 'Yesterday';
   const date = dateFromKey(key);
-  const sameYear = date.getFullYear() === new Date().getFullYear();
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  }).format(date);
+  return (date.getFullYear() === today.getFullYear() ? dueThisYear : dueOtherYear).format(date);
 }
 
 export function isOverdue(key: string): boolean {
